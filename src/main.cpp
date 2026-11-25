@@ -24,9 +24,9 @@ uint16_t PAN_ID = 0x6769;
 uint16_t MY_ID = 0x1717;
 volatile bool connected = false;
 volatile bool master = false;
-volatile bool addOffset = false;
+volatile bool addOffset = false;  //decides with what colour a node have to start
 
-static void applyZigbeeConfig() {
+static void applyZigbeeConfig() {            //ZigBee setup
   if (!zigbee) {
     return;
   }
@@ -60,9 +60,9 @@ static void drawDisplay() {
   }
 }
 
-class MasterCallbacks : public BLECharacteristicCallbacks {
+class MasterCallbacks : public BLECharacteristicCallbacks { 
 
-  void onWrite(BLECharacteristic *c) {
+  void onWrite(BLECharacteristic *c) {  //function for deciding who is the master and who is the slave
     String v = c->getValue();
     v.trim();
     v.toLowerCase();
@@ -76,13 +76,13 @@ class MasterCallbacks : public BLECharacteristicCallbacks {
     }
 
     c->setValue(master ? "master" : "slave");
-    applyZigbeeConfig();
+    applyZigbeeConfig();  //appling master to the ZigBee setup
   }
 };
 
 class addOffsetCallbacks : public BLECharacteristicCallbacks {
 
-  void onWrite(BLECharacteristic *c) {
+  void onWrite(BLECharacteristic *c) {  //funciont for deciding who have to start green or red
     String v = c->getValue();
     v.trim();
     v.toLowerCase();
@@ -131,7 +131,7 @@ void setup(){
 
   applyZigbeeConfig();
 
-  BLEDevice::init("TF-black");  //blue, black, white
+  BLEDevice::init("TF-black");  //blue, black, white, orange
   BLEServer *server = BLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
   BLEService *svc = server->createService(SERVICE_UUID);
