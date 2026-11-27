@@ -1,7 +1,6 @@
 #include <iot_board.h>
 #include <BLEDevice.h>
 
-
 #define SERVICE_UUID "70cb215d-b1a7-4963-90c4-5ad3a70caf0c"
 
 // One characteristic for each configuration parameter
@@ -9,31 +8,17 @@
 #define ColorOffset_UUID    "98ac8717-565f-4356-bb76-82fbc390f509"
 
 #define MAX_NODES 4
-#define HEARTBEAT_INTERVAL 500  // Ogni scheda manda HELLO ogni 500 ms
-#define NODE_TIMEOUT       3000  // Se non si sente per 2 secondi, viene rimossa
-
-struct PeerNode {
-  uint16_t addr;
-  unsigned long lastSeen; // Timestamp millis() dell'ultimo HELLO
-  bool active;
-};
-
-PeerNode nodes[MAX_NODES];  //by default all is set at 0 by the compiler
-
-static enum{
-  HELLO_PKT = 0,
-  START_PKT = 1
-}PacketType;
+#define HEARTBEAT_INTERVAL 500  //the boards will send Hello_packet every 500ms
+#define NODE_TIMEOUT       3000  //timeout used to eventually remove a board (if dead) 
 
 /**
  * Configuration variables:
- * channel   : 802.15.4 channel, possible values 11-16
- * PAN_ID    : id of the private network, necessary for communication
- * MY_ID     : id of the device inside the PAN
- * connected : whether or not the device is connected to the PAN
+ * channel   : 802.15.4 channel, possible values 15-20-25-26
+ * PAN_ID    : id of the private ZigBee network, necessary for communication
+ * MY_ID     : id of the device inside the ZigBee PAN
+ * connected : whether or not the device is connected to the BLE PAN
  * master    : whether or not the device is the master
- * ColorOffset : whether or not the traffic light has an offset 
- *             in relation to the other traffic lights
+ * ColorOffset : start color of the specific board
  */
 
 uint16_t channel = 15;
@@ -43,6 +28,19 @@ volatile bool connected = false;
 volatile bool master = false;
 volatile bool ColorOffset = false;  //decides with what colour a node have to start
 volatile bool isIdle = true;
+
+struct PeerNode {
+  uint16_t addr;
+  unsigned long lastSeen; // Timestamp millis() from last HELLO
+  bool active;
+};
+
+PeerNode nodes[MAX_NODES];  //by default all is set at 0 by the compiler
+
+static enum{
+  HELLO_PKT = 0,
+  START_PKT = 1
+}PacketType;
 
 static void applyZigbeeConfig() {            //ZigBee setup
   if (!zigbee) {
@@ -80,7 +78,7 @@ static void drawDisplay() {
 
 class MasterCallbacks : public BLECharacteristicCallbacks { 
 
-  void onWrite(BLECharacteristic *c) {  //function for deciding who is the master and who is the slave
+  void onWrite(BLECharacteristic *c) {  //function to deciding who is the master and who is the slave
     String v = c->getValue();
     v.trim();
     v.toLowerCase();
@@ -100,7 +98,7 @@ class MasterCallbacks : public BLECharacteristicCallbacks {
 
 class ColorOffsetCallbacks : public BLECharacteristicCallbacks {
 
-  void onWrite(BLECharacteristic *c) {  //funciont for deciding who have to start green or red
+  void onWrite(BLECharacteristic *c) {  //function to deciding who have to start green or red
     String v = c->getValue();
     v.trim();
     v.toLowerCase();
@@ -145,28 +143,28 @@ void updateNodeHeartbeat(uint16_t addr) {
   for (int i = 0; i < MAX_NODES; i++) {
     if (nodes[i].active) {
       if (nodes[i].addr == addr) {
-        nodes[i].lastSeen = now; // Nodo già noto: rinnova il timer
+        nodes[i].lastSeen = now; //already known node: reset the timer
         return;
       }
     } else if (freeSlot == -1) {
-      freeSlot = i; // Memorizza il primo posto libero
+      freeSlot = i; //stores the first free slot
     }
   }
 
-  // Se non era in lista e c'è spazio, aggiungilo
+  //if not in the list, new node added
   if (freeSlot != -1) {
     nodes[freeSlot].addr = addr;
     nodes[freeSlot].lastSeen = now;
     nodes[freeSlot].active = true;
   }
 
-  uint8_t activeCounter = 0;
+  uint8_t activeCounter = 0;          //counter for active nodes
   for (int i = 0; i < MAX_NODES; i++) {
     if (nodes[i].active) {
       activeCounter++;
     }
   }
-  if(activeCounter == MAX_NODES){
+  if(activeCounter == MAX_NODES){ //if active nodes are not == MAX_NODES the board will go in idleState
     isIdle = false;
     digitalWrite(LED_YELLOW,LOW);
   }
@@ -174,12 +172,11 @@ void updateNodeHeartbeat(uint16_t addr) {
 }
 
 
-void pruneDeadNodes() {
+void pruneDeadNodes() {       //remove dead nodes from the array
   unsigned long now = millis();
-  // Partiamo da 1 perché nodes[0] siamo noi stessi
+  //start at i = 1 because nodes[0] is this board
   for (int i = 1; i < MAX_NODES; i++) {
-    if (nodes[i].active && (now - nodes[i].lastSeen > NODE_TIMEOUT)) {
-      //Serial.printf("Nodo 0x%04X scaduto, rimosso!\n", nodes[i].addr);
+    if (nodes[i].active && (now - nodes[i].lastSeen > NODE_TIMEOUT)) {  //the node is not active
       nodes[i].active = false;
       nodes[i].addr = 0;
       isIdle = true;
@@ -194,7 +191,7 @@ volatile bool received = false, isHelloPacket = false, isStartPacket = false;
 uint8_t whatPacket = 0;
 
 void onZigbeeReceive(rx_info_t *packet) {
-  uint16_t senderAddr = packet->src_addr; // Legge direttamente l'indirizzo MAC[cite: 1, 2]
+  uint16_t senderAddr = packet->src_addr;
   uint8_t whatPacket = zigbee->read();
 
   if (whatPacket == HELLO_PKT) {
@@ -210,7 +207,7 @@ void sendHelloPacket(){
 
   zigbee->startPacket();
   zigbee->write((uint8_t)HELLO_PKT);  //writes uint8_t 0
-  zigbee->sendPacket(0xFFFF, false);  //false means that we not want ACK 
+  zigbee->sendPacket(0xFFFF, false);  //false means that we do not want ACK 
 
 }
 
@@ -285,8 +282,6 @@ void loop(){
   if(IoTBoard::runEvery(500,3)){
     sendHelloPacket();  
   }
-
-
 
   if(IoTBoard::runEvery(500,4)){
     drawDisplay();
