@@ -9,8 +9,8 @@
 #define ColorOffset_UUID    "98ac8717-565f-4356-bb76-82fbc390f509"
 
 #define MAX_NODES 4
-#define HEARTBEAT_INTERVAL 500  // Ogni scheda manda HELLO ogni 2 secondi
-#define NODE_TIMEOUT       2000  // Se non si sente per 6 secondi (3 pacchetti persi), viene rimossa
+#define HEARTBEAT_INTERVAL 500  // Ogni scheda manda HELLO ogni 500 ms
+#define NODE_TIMEOUT       2000  // Se non si sente per 2 secondi, viene rimossa
 
 struct PeerNode {
   uint16_t addr;
@@ -205,6 +205,13 @@ void onZigbeeReceive(rx_info_t *packet) {
   }
 }
 
+void sendHelloPacket(){
+
+  zigbee->startPacket();
+  zigbee->write((uint8_t)HELLO_PKT);  //writes uint8_t 0
+  zigbee->sendPacket(0xFFFF, false);  //false means that we not want ACK 
+
+}
 
 
 void setup(){
@@ -273,6 +280,12 @@ void loop(){
       digitalWrite(LED_YELLOW, !digitalRead(LED_YELLOW));  
     }
   }
+
+  if(IoTBoard::runEvery(500,3)){
+    sendHelloPacket();  
+  }
+
+
 
   // Update the display only every 500 ms
   static unsigned long lastDraw = 0;
