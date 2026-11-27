@@ -1,2 +1,2 @@
 # TrafficLights_BLE_ZigBee
-Trafficlights using BLE and ZigBee (802.15.4) 
+Implementation of 4 traffic lights using BLE and ZigBee (802.15.4)
