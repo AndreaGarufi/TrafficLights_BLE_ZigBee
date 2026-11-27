@@ -10,7 +10,7 @@
 
 #define MAX_NODES 4
 #define HEARTBEAT_INTERVAL 500  // Ogni scheda manda HELLO ogni 500 ms
-#define NODE_TIMEOUT       2000  // Se non si sente per 2 secondi, viene rimossa
+#define NODE_TIMEOUT       3000  // Se non si sente per 2 secondi, viene rimossa
 
 struct PeerNode {
   uint16_t addr;
@@ -166,8 +166,9 @@ void updateNodeHeartbeat(uint16_t addr) {
       activeCounter++;
     }
   }
-  if(activeCounter == 4){
+  if(activeCounter == MAX_NODES){
     isIdle = false;
+    digitalWrite(LED_YELLOW,LOW);
   }
   
 }
@@ -187,8 +188,8 @@ void pruneDeadNodes() {
 }
 
 
-                            //0                     1
-bool received = false, isHelloPacket = false, isStartPacket = false;
+                                    //0                     1
+volatile bool received = false, isHelloPacket = false, isStartPacket = false;
 //uint16_t lastAddrRecv;
 uint8_t whatPacket = 0;
 
@@ -287,14 +288,10 @@ void loop(){
 
 
 
-  // Update the display only every 500 ms
-  static unsigned long lastDraw = 0;
-  if (millis() - lastDraw < 500) {
-    return;
-  }
-  lastDraw = millis();
-
-  drawDisplay();
+  if(IoTBoard::runEvery(500,4)){
+    drawDisplay();
+  }  
+    
 
 
 
