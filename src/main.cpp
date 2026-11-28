@@ -23,7 +23,7 @@
 
 uint16_t channel = 15;
 uint16_t PAN_ID = 0x6769;
-uint16_t MY_ID = 0x1717;
+uint16_t MY_ID = 0x1718;
 volatile bool connected = false;
 volatile bool master = false;
 volatile bool ColorOffset = false;  //decides with what colour a node have to start
@@ -60,7 +60,7 @@ static void drawDisplay() {
   if(connected){
     display->clearDisplay();
     display->setCursor(0,0);
-    display->printf("Connected!\n");
+    display->printf("Connected with BLE!\n");
     display->printf("CH: %d\n", channel);
     display->printf("PAN: 0x%04X\n", PAN_ID);
     display->printf("MY_ID: 0x%04X\n", MY_ID);
@@ -71,7 +71,11 @@ static void drawDisplay() {
   }else{
     display->clearDisplay();
     display->setCursor(0,0);
-    display->printf("Not connected");
+    display->printf("NotConnected with BLE\n");
+    display->printf("CH: %d\n", channel);
+    display->printf("PAN: 0x%04X\n", PAN_ID);
+    display->printf("MY_ID: 0x%04X\n", MY_ID);
+    display->printf("Master: %s\n", master ? "true" : "false");
     display->display();    
   }
 }
